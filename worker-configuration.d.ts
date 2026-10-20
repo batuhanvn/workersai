@@ -8,6 +8,7 @@ declare namespace Cloudflare {
 		CLOUDFLARE_AI_GATEWAY_ID: string;
 		CLOUDFLARE_AI_GATEWAY_TOKEN: string;
 		CLOUDFLARE_WORKERS_AI_TOKEN: string;
+		TTS_API_TOKEN: string;
 		WORKERS_AI_DURABLE_OBJECT: DurableObjectNamespace<
 			import("./src/index").WorkersAIDurableObject
 		>;
