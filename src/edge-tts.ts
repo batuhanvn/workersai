@@ -89,12 +89,26 @@ export async function synthesize(
 
 	return new ReadableStream<Uint8Array>({
 		start(controller) {
-			const fail = (error: unknown) => controller.error(error);
+			const fail = (error: unknown) => {
+				clearTimeout(timer);
+				controller.error(error);
+			};
+			// The read-aloud service can accept a voice but never respond; the
+			// runtime kills a request that hangs ~3.4s, so fail first.
+			const timer = setTimeout(() => {
+				try {
+					socket.close(1000);
+				} catch {
+					// already closed
+				}
+				fail(new Error(`no audio from voice ${voice}`));
+			}, 2500);
 
 			socket.addEventListener("message", (event) => {
 				if (typeof event.data === "string") {
 					const path = parseHeaders(event.data).Path;
 					if (path === "turn.end") {
+						clearTimeout(timer);
 						socket.close();
 						if (received) controller.close();
 						else fail(new Error("no audio received"));
@@ -105,10 +119,12 @@ export async function synthesize(
 				if (headers.Path !== "audio" || body.length === 0) return;
 				if (headers["Content-Type"] !== "audio/mpeg") return;
 				received = true;
+				clearTimeout(timer);
 				controller.enqueue(body);
 			});
 			socket.addEventListener("error", fail);
 			socket.addEventListener("close", () => {
+				clearTimeout(timer);
 				if (received) controller.close();
 			});
 

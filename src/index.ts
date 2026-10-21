@@ -24,7 +24,28 @@ async function handleTts(request: Request, env: Env) {
 			: DEFAULT_TTS_VOICE;
 	try {
 		const audio = await synthesize(body.text.trim().slice(0, 5000), voice);
-		return new Response(audio, {
+		const reader = audio.getReader();
+		const first = await reader.read();
+		if (first.done) {
+			return new Response("TTS error: no audio received", {
+				status: 502,
+				headers: cors,
+			});
+		}
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(first.value);
+			},
+			async pull(controller) {
+				const chunk = await reader.read();
+				if (chunk.done) controller.close();
+				else controller.enqueue(chunk.value);
+			},
+			cancel(reason) {
+				return reader.cancel(reason);
+			},
+		});
+		return new Response(stream, {
 			headers: { ...cors, "content-type": "audio/mpeg" },
 		});
 	} catch (error) {
